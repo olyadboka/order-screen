@@ -1,0 +1,52 @@
+{
+  "name": "screening",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prove": "tsx scripts/prove.ts",
+    "db:generate": "prisma generate",
+    "db:apply": "tsx scripts/db-apply.ts",
+    "db:seed": "tsx prisma/seed.ts",
+    "db:setup": "npm run db:apply && npm run db:seed",
+    "postinstall": "prisma generate"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^1.1.0",
+    "@prisma/adapter-neon": "^6.19.3",
+    "@prisma/client": "^6.16.0",
+    "@types/dotenv": "^6.1.1",
+    "bcryptjs": "^3.0.3",
+    "decimal.js": "^10.6.0",
+    "dexie": "^4.4.6",
+    "dotenv": "^18.0.3",
+    "jose": "^6.2.12",
+    "next": "16.3.6",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "ws": "^8.21.3",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@types/ws": "^8.18.1",
+    "eslint": "^9",
+    "eslint-config-next": "16.3.6",
+    "prisma": "^6.16.0",
+    "tailwindcss": "^4",
+    "tsx": "^4",
+    "typescript": "^5",
+    "vitest": "^3"
+  }
+}
