@@ -1,0 +1,89 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  ADVISER
+  OWNER
+}
+
+enum Band {
+  SAND
+  RED
+  BLOCKED
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  role         Role     @default(ADVISER)
+  orders       Order[]
+  createdAt    DateTime @default(now())
+}
+
+model Dealer {
+  id        String   @id @default(cuid())
+  name      String
+  orders    Order[]
+  createdAt DateTime @default(now())
+}
+
+model Product {
+  id        String      @id @default(cuid())
+  name      String
+  priceUsd  Decimal     @db.Decimal(12, 2)
+  active    Boolean     @default(true)
+  lines     OrderLine[]
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+}
+
+model Setting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+model Order {
+  id        String      @id @default(cuid())
+  clientId  String?     @unique
+  dealer    Dealer      @relation(fields: [dealerId], references: [id])
+  dealerId  String
+  adviser   User        @relation(fields: [adviserId], references: [id])
+  adviserId String
+  rate      Decimal     @db.Decimal(12, 2)
+  totalUsd  Decimal     @db.Decimal(14, 2)
+  totalSdg  Decimal     @db.Decimal(18, 2)
+  lines     OrderLine[]
+  createdAt DateTime    @default(now())
+
+  @@index([dealerId])
+  @@index([adviserId])
+}
+
+model OrderLine {
+  id            String  @id @default(cuid())
+  order         Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId       String
+  product       Product @relation(fields: [productId], references: [id])
+  productId     String
+  productName   String
+  unitPriceUsd  Decimal @db.Decimal(12, 2)
+  quantity      Int
+  discountUsd   Decimal @db.Decimal(12, 2)
+  discountPct   Decimal @db.Decimal(6, 2)
+  band          Band
+  netUsd        Decimal @db.Decimal(14, 2)
+  ownerApproved Boolean @default(false)
+  approvedById  String?
+
+  @@index([orderId])
+}
