@@ -29,32 +29,39 @@ These exact numbers are asserted in `tests/order.test.ts`.
 
 ## Stack
 
-Next.js (App Router) · TypeScript · Tailwind · PostgreSQL (Neon) · Prisma ·
-JWT auth (jose + bcrypt) · Dexie (offline outbox) · Vitest.
+Next.js 16 (App Router) · TypeScript · Tailwind · PostgreSQL (Neon) · Prisma
+via the **Neon serverless driver adapter** · JWT auth (jose + bcrypt) ·
+Dexie (offline outbox) · Vitest.
 
 Money is handled with `decimal.js` end to end — no floats — so the example
 reproduces to the cent.
 
+> **Why the Neon serverless adapter?** Many networks block the native Postgres
+> port (5432). Prisma runs here through `@prisma/adapter-neon`, which tunnels
+> Postgres over HTTPS/WebSocket (443). The schema is applied over the same
+> channel (`npm run db:apply`) instead of `prisma migrate`, so setup works even
+> where 5432 is blocked — and unchanged on Vercel.
+
 ## Setup
 
 1. **Database (Neon).** Create a free project at https://neon.tech and copy the
-   connection string. Put it in `.env` (see `.env.example`):
+   connection string into `.env` (see `.env.example`):
 
    ```
-   DATABASE_URL="postgresql://...-pooler...neon.tech/db?sslmode=require"
-   DIRECT_URL="postgresql://...neon.tech/db?sslmode=require"   # or same as DATABASE_URL
-   AUTH_SECRET="<32+ char secret>"
+   DATABASE_URL="postgresql://...-pooler...neon.tech/neondb?sslmode=require"
+   AUTH_SECRET="<32+ char secret>"   # openssl rand -hex 32
    ```
 
-2. **Install, migrate, seed, run:**
+2. **Install, apply schema, seed, run:**
 
    ```bash
-   npm install
-   npm run db:generate
-   npm run db:migrate      # creates the schema
-   npm run db:seed         # users, dealers, products, default rate 8,200
+   npm install             # also runs `prisma generate` (postinstall)
+   npm run db:setup        # applies the schema over HTTPS, then seeds
    npm run dev             # http://localhost:3000
    ```
+
+   `db:setup` = `db:apply` (idempotent DDL over the Neon HTTPS driver) + `db:seed`
+   (users, dealers, products, default rate 8,200).
 
 ### Seeded logins
 
@@ -118,8 +125,10 @@ idempotency key, so a replay never creates a duplicate.
 
 ## Deployment
 
-Deploy to Vercel, set the same three env vars in the project settings (pointing
-at the same Neon database), and run `db:migrate` + `db:seed` once against it.
+Deploy to Vercel, set `DATABASE_URL` and `AUTH_SECRET` in the project settings
+(pointing at the same Neon database), and run `npm run db:setup` once against it.
+The app talks to Neon over HTTPS in every environment, so nothing changes between
+local dev and production.
 
 ## What I would do differently in the real build
 
