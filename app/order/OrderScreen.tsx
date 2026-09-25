@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { computeLine, validateOrder, RATE_FLOOR, type Band, type Role } from "@/lib/order";
 import { enqueue, flushOutbox, pendingCount } from "@/lib/offline";
 import NavTabs from "@/app/_components/NavTabs";
@@ -9,9 +10,11 @@ import NavTabs from "@/app/_components/NavTabs";
 interface Product { id: string; name: string; priceUsd: number }
 interface Dealer { id: string; name: string }
 interface DraftLine { productId: string; quantity: number; discountUsd: number; ownerApproved: boolean }
+interface RecentOrder { id: string; dealer: string; adviser: string; totalUsd: number; totalSdg: number; createdAt: string; lineCount: number }
 
 const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 const sdg = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
+const when = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" });
 
 const bandStyle: Record<Band, string> = {
   SAND: "bg-sun-50 text-sun-700 border-sun-200",
@@ -61,7 +64,19 @@ export default function OrderScreen({ user, defaultRate }: { user: { name: strin
   const [editValue, setEditValue] = useState("");
   const [savingPrice, setSavingPrice] = useState(false);
 
+  const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
+
   const productById = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
+
+  const refreshRecent = useCallback(async () => {
+    try {
+      const res = await fetch("/api/orders");
+      if (res.ok) {
+        const body = await res.json();
+        setRecentOrders((body.orders ?? []).slice(0, 5));
+      }
+    } catch { /* offline: leave as-is */ }
+  }, []);
 
   useEffect(() => {
     Promise.all([
@@ -75,7 +90,8 @@ export default function OrderScreen({ user, defaultRate }: { user: { name: strin
         if (p.products?.[0]) setPickProductId(p.products[0].id);
       })
       .catch(() => setMessage({ kind: "warn", text: "Could not load catalog (offline?). Using cached form." }));
-  }, []);
+    refreshRecent();
+  }, [refreshRecent]);
 
   const refreshPending = useCallback(async () => {
     try { setPending(await pendingCount()); } catch { /* noop */ }
@@ -170,6 +186,7 @@ export default function OrderScreen({ user, defaultRate }: { user: { name: strin
         const t = body.totals ?? { totalUsd: computed.validation.order.totalUsd, totalSdg: computed.validation.order.totalSdg };
         setMessage({ kind: "ok", text: `Saved. ${usd.format(t.totalUsd)} = ${sdg.format(t.totalSdg)} SDG at rate ${payload.rate}.` });
         setLines([]);
+        refreshRecent();
       } else {
         const body = await res.json().catch(() => ({}));
         setMessage({ kind: "err", text: body.error ?? `Refused (HTTP ${res.status}).` });
@@ -512,6 +529,39 @@ export default function OrderScreen({ user, defaultRate }: { user: { name: strin
             {saving ? "Saving…" : "Save order"}
           </button>
         </section>
+
+        {recentOrders.length > 0 && (
+          <section className="overflow-hidden rounded-2xl border border-line bg-surface shadow-card">
+            <div className="flex items-center justify-between border-b border-line px-5 py-3">
+              <h2 className="text-sm font-semibold text-ink">Recent orders</h2>
+              <Link href="/orders" className="text-sm font-medium text-sun-700 transition hover:text-sun-600">
+                View all →
+              </Link>
+            </div>
+            <ul>
+              {recentOrders.map((o) => (
+                <li key={o.id}>
+                  <Link
+                    href="/orders"
+                    className="flex items-center justify-between gap-3 border-b border-line/70 px-5 py-3 transition last:border-0 hover:bg-sun-50/30"
+                  >
+                    <div className="min-w-0">
+                      <div className="font-medium text-ink">{o.dealer}</div>
+                      <div className="text-xs text-muted">
+                        {when.format(new Date(o.createdAt))} · {o.lineCount} line{o.lineCount === 1 ? "" : "s"}
+                        {isOwner && ` · ${o.adviser}`}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="nums font-semibold text-ink">{usd.format(o.totalUsd)}</div>
+                      <div className="nums text-xs text-muted">{sdg.format(o.totalSdg)} SDG</div>
+                    </div>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
       </div>
     </main>
   );
