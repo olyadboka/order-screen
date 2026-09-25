@@ -13,6 +13,7 @@
     "db:generate": "prisma generate",
     "db:apply": "tsx scripts/db-apply.ts",
     "db:seed": "tsx prisma/seed.ts",
+    "db:seed:orders": "tsx scripts/seed-orders.ts",
     "db:setup": "npm run db:apply && npm run db:seed",
     "postinstall": "prisma generate"
   },

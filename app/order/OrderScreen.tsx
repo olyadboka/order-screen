@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { computeLine, validateOrder, RATE_FLOOR, type Band, type Role } from "@/lib/order";
 import { enqueue, flushOutbox, pendingCount } from "@/lib/offline";
+import NavTabs from "@/app/_components/NavTabs";
 
 interface Product { id: string; name: string; priceUsd: number }
 interface Dealer { id: string; name: string }
@@ -54,6 +55,11 @@ export default function OrderScreen({ user, defaultRate }: { user: { name: strin
   const [pending, setPending] = useState(0);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ kind: "ok" | "warn" | "err"; text: string } | null>(null);
+
+  // Owner-only price editing
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState("");
+  const [savingPrice, setSavingPrice] = useState(false);
 
   const productById = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
 
@@ -116,7 +122,9 @@ export default function OrderScreen({ user, defaultRate }: { user: { name: strin
 
   const rateBelowFloor = (Number(rateInput) || 0) < RATE_FLOOR;
   const blockedUnapproved = computed.perLine.some((l) => l.band === "BLOCKED" && !l.ownerApproved);
-  const canSave = dealerId !== "" && lines.length > 0 && !rateBelowFloor && !blockedUnapproved;
+  const discountExceedsLine = computed.perLine.some((l) => l.netUsd < 0);
+  const canSave =
+    dealerId !== "" && lines.length > 0 && !rateBelowFloor && !blockedUnapproved && !discountExceedsLine;
 
   function addLine() {
     if (!pickProductId) return;
@@ -177,6 +185,36 @@ export default function OrderScreen({ user, defaultRate }: { user: { name: strin
     }
   }
 
+  async function savePrice(productId: string) {
+    const price = Number(editValue);
+    if (!(price > 0)) {
+      setMessage({ kind: "err", text: "Price must be greater than 0." });
+      return;
+    }
+    setSavingPrice(true);
+    try {
+      const res = await fetch(`/api/products/${productId}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ priceUsd: price }),
+      });
+      if (res.ok) {
+        const body = await res.json();
+        const np = body.product?.priceUsd ?? price;
+        setProducts((prev) => prev.map((p) => (p.id === productId ? { ...p, priceUsd: np } : p)));
+        setEditingId(null);
+        setMessage({ kind: "ok", text: `Price updated to ${usd.format(np)}.` });
+      } else {
+        const body = await res.json().catch(() => ({}));
+        setMessage({ kind: "err", text: body.error ?? "Could not update price." });
+      }
+    } catch {
+      setMessage({ kind: "warn", text: "Offline — price changes need a connection." });
+    } finally {
+      setSavingPrice(false);
+    }
+  }
+
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });
     router.replace("/login");
@@ -189,19 +227,21 @@ export default function OrderScreen({ user, defaultRate }: { user: { name: strin
   return (
     <main className="min-h-screen bg-canvas text-ink">
       <header className="sticky top-0 z-20 border-b border-line bg-surface/85 backdrop-blur">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3 sm:px-6">
+        <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <div className="flex items-center gap-3">
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-b from-sun-400 to-sun-600 text-white shadow-lift">
               <SunMark className="h-5 w-5" />
             </span>
-            <div className="leading-tight">
-              <h1 className="text-[15px] font-semibold tracking-tight">New Order</h1>
+            <div className="hidden leading-tight sm:block">
+              <h1 className="text-[15px] font-semibold tracking-tight">Order Desk</h1>
               <p className="text-xs text-muted">
                 {user.name} · <span className="capitalize">{user.role.toLowerCase()}</span>
                 {isOwner && " · can approve & set prices"}
               </p>
             </div>
           </div>
+
+          <NavTabs />
 
           <div className="flex items-center gap-3 text-sm">
             <span
@@ -334,7 +374,56 @@ export default function OrderScreen({ user, defaultRate }: { user: { name: strin
                           <span className="font-medium text-ink">{c.productName}</span>
                         </div>
                       </td>
-                      <td className="nums px-3 py-3 text-muted">{usd.format(c.unitPriceUsd)}</td>
+                      <td className="nums px-3 py-3 text-muted">
+                        {isOwner ? (
+                          editingId === c.productId ? (
+                            <span className="inline-flex items-center gap-1">
+                              <input
+                                type="number"
+                                min={0}
+                                step="0.01"
+                                autoFocus
+                                value={editValue}
+                                onChange={(e) => setEditValue(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") savePrice(c.productId);
+                                  if (e.key === "Escape") setEditingId(null);
+                                }}
+                                className="nums w-24 rounded-lg border border-sun-300 px-2.5 py-1.5 text-ink shadow-sm"
+                              />
+                              <button
+                                onClick={() => savePrice(c.productId)}
+                                disabled={savingPrice}
+                                aria-label="Save price"
+                                className="rounded-md px-1.5 py-1 text-emerald-600 transition hover:bg-emerald-50 disabled:opacity-50"
+                              >
+                                ✓
+                              </button>
+                              <button
+                                onClick={() => setEditingId(null)}
+                                aria-label="Cancel price edit"
+                                className="rounded-md px-1.5 py-1 text-muted transition hover:bg-canvas"
+                              >
+                                ✕
+                              </button>
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => {
+                                setEditingId(c.productId);
+                                setEditValue(String(c.unitPriceUsd));
+                              }}
+                              title="Edit price (owner only)"
+                              className="group inline-flex items-center gap-1 rounded-md px-1.5 py-1 transition hover:bg-sun-50 hover:text-ink"
+                            >
+                              {usd.format(c.unitPriceUsd)}
+                              <span className="text-sun-500 opacity-60 group-hover:opacity-100">✎</span>
+                            </button>
+                          )
+                        ) : (
+                          usd.format(c.unitPriceUsd)
+                        )}
+                      </td>
                       <td className="px-3 py-3">
                         <input
                           type="number"
@@ -406,6 +495,12 @@ export default function OrderScreen({ user, defaultRate }: { user: { name: strin
               <div className="mt-1 inline-flex items-center gap-1.5 text-sm font-medium text-rose-700">
                 <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
                 A blocked line needs owner approval before saving.
+              </div>
+            )}
+            {discountExceedsLine && (
+              <div className="mt-1 inline-flex items-center gap-1.5 text-sm font-medium text-rose-700">
+                <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
+                A discount is larger than its line value. Reduce it to save.
               </div>
             )}
           </div>

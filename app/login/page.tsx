@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 function SunMark({ className = "" }: { className?: string }) {
@@ -21,6 +21,10 @@ function LoginForm() {
   const [password, setPassword] = useState("Passw0rd!");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Until the client mounts, the submit handler is not attached; keep the
+  // button disabled so an early click can never silently no-op.
+  const [ready, setReady] = useState(false);
+  useEffect(() => setReady(true), []);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -82,10 +86,10 @@ function LoginForm() {
 
         <button
           type="submit"
-          disabled={busy}
+          disabled={busy || !ready}
           className="w-full rounded-lg bg-gradient-to-b from-sun-500 to-sun-600 px-4 py-2.5 font-semibold text-white shadow-lift transition hover:from-sun-400 hover:to-sun-500 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {busy ? "Signing in…" : "Sign in"}
+          {busy ? "Signing in…" : !ready ? "Loading…" : "Sign in"}
         </button>
       </form>
 

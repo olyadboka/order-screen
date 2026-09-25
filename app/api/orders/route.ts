@@ -22,14 +22,18 @@ const bodySchema = z.object({
 export async function GET() {
   const guard = await requireUser();
   if (isDenied(guard)) return guard.response;
+  const user = guard;
 
+  // An owner oversees every adviser's orders; an adviser sees only their own.
   const orders = await prisma.order.findMany({
+    where: user.role === "OWNER" ? {} : { adviserId: user.id },
     orderBy: { createdAt: "desc" },
     include: { dealer: true, adviser: true, lines: true },
     take: 50,
   });
 
   return json({
+    scope: user.role === "OWNER" ? "all" : "own",
     orders: orders.map((o) => ({
       id: o.id,
       dealer: o.dealer.name,
@@ -38,7 +42,18 @@ export async function GET() {
       totalUsd: Number(o.totalUsd),
       totalSdg: Number(o.totalSdg),
       createdAt: o.createdAt,
-      lines: o.lines.length,
+      lineCount: o.lines.length,
+      approvedCount: o.lines.filter((l) => l.band === "BLOCKED" && l.ownerApproved).length,
+      lines: o.lines.map((l) => ({
+        productName: l.productName,
+        quantity: l.quantity,
+        unitPriceUsd: Number(l.unitPriceUsd),
+        discountUsd: Number(l.discountUsd),
+        discountPct: Number(l.discountPct),
+        band: l.band,
+        netUsd: Number(l.netUsd),
+        ownerApproved: l.ownerApproved,
+      })),
     })),
   });
 }

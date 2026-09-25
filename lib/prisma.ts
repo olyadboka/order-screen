@@ -10,6 +10,11 @@ if (typeof globalThis.WebSocket === "undefined") {
   neonConfig.webSocketConstructor = ws;
 }
 
+// Run queries over HTTPS fetch instead of a WebSocket. This is more robust on
+// serverless (no per-request socket cold start, which can surface as a 500) and
+// on networks where long-lived WebSocket connections are unreliable.
+neonConfig.poolQueryViaFetch = true;
+
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
 function createClient(): PrismaClient {
