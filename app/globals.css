@@ -1,9 +1,74 @@
 @import "tailwindcss";
 
-:root {
+@theme {
+  /* Warm solar premium palette */
+  --color-ink: #1c1712;
+  --color-ink-soft: #4a4038;
+  --color-muted: #8a7d70;
+  --color-line: #ece5db;
+  --color-line-strong: #ddd2c3;
+  --color-canvas: #f7f3ec;
+  --color-surface: #ffffff;
+
+  /* Sun / amber accent ramp */
+  --color-sun-50: #fdf6ec;
+  --color-sun-100: #f9e8cc;
+  --color-sun-200: #f3d59a;
+  --color-sun-300: #ecbc63;
+  --color-sun-400: #e3a13a;
+  --color-sun-500: #d9861c;
+  --color-sun-600: #bf6b11;
+  --color-sun-700: #984f10;
+
+  /* Espresso surfaces for hero / dark panels */
+  --color-espresso: #1a1410;
+  --color-espresso-soft: #2a201a;
+
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+  --radius-xl: 1rem;
+  --radius-2xl: 1.25rem;
+
+  --shadow-card: 0 1px 2px rgba(26, 20, 16, 0.04), 0 8px 24px -12px rgba(26, 20, 16, 0.12);
+  --shadow-lift: 0 2px 4px rgba(26, 20, 16, 0.05), 0 18px 40px -16px rgba(26, 20, 16, 0.22);
+}
+
+html {
   color-scheme: light;
 }
 
 body {
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  font-family: var(--font-sans);
+  background-color: var(--color-canvas);
+  color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Tabular, aligned numerals everywhere money and quantities live */
+.nums {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1, "cv01" 1;
+}
+
+/* Consistent, warm focus ring */
+input:focus-visible,
+select:focus-visible,
+button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(217, 134, 28, 0.28);
+  border-color: var(--color-sun-500);
+}
+
+::selection {
+  background: rgba(217, 134, 28, 0.22);
+}
+
+/* Subtle entrance for surfaces */
+@keyframes rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.rise {
+  animation: rise 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
